@@ -10,9 +10,18 @@ from pydantic import BaseModel
 import hashlib
 import secrets
 
-# Initialize Supabase client
+# Initialize Supabase client with debugging
 supabase_url: str = os.getenv("SUPABASE_URL")
 supabase_service_key: str = os.getenv("SUPABASE_SERVICE_ROLE_KEY")
+
+print("=== BACKEND INITIALIZATION DEBUG ===")
+print(f"SUPABASE_URL: {repr(supabase_url)}")
+print(f"SUPABASE_SERVICE_ROLE_KEY: {'SET' if supabase_service_key else 'NOT SET'}")
+if supabase_service_key:
+    print(f"Key length: {len(supabase_service_key)}")
+    print(f"Key starts with: {repr(supabase_service_key[:20])}...")
+print("=====================================")
+
 supabase: Client = create_client(supabase_url, supabase_service_key)
 
 # JWT settings
@@ -174,39 +183,60 @@ async def signup(user: UserSignup):
     
     # Create user in Supabase Auth
     try:
+        print(f"Attempting to create user: {user.email}")
         auth_response = supabase.auth.sign_up({
             "email": user.email,
             "password": user.password,
         })
+        print(f"Supabase auth response: {auth_response}")
     except Exception as e:
+        print(f"Supabase auth error: {str(e)}")
+        print(f"Error type: {type(e)}")
         raise HTTPException(status_code=400, detail=str(e))
     
     # Get the user id from the auth response
-    user_id = auth_response.user.id
+    try:
+        user_id = auth_response.user.id
+        print(f"User ID: {user_id}")
+    except Exception as e:
+        print(f"Error getting user ID: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Failed to get user ID: {str(e)}")
     
     # Create access and refresh tokens
-    access_token_expires = timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
-    access_token = create_access_token(
-        data={"sub": user.email, "user_id": user_id}, expires_delta=access_token_expires
-    )
-    
-    refresh_token = create_refresh_token(
-        data={"sub": user.email, "user_id": user_id}, expires_delta=timedelta(days=REFRESH_TOKEN_EXPIRE_DAYS)
-    )
+    try:
+        access_token_expires = timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
+        access_token = create_access_token(
+            data={"sub": user.email, "user_id": user_id}, expires_delta=access_token_expires
+        )
+        
+        refresh_token = create_refresh_token(
+            data={"sub": user.email, "user_id": user_id}, expires_delta=timedelta(days=REFRESH_TOKEN_EXPIRE_DAYS)
+        )
+    except Exception as e:
+        print(f"Error creating tokens: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Failed to create tokens: {str(e)}")
     
     # Store hashed refresh token in database
-    hashed_token = hash_refresh_token(refresh_token)
-    supabase.table("refresh_tokens").insert({
-        "hashed_token": hashed_token,
-        "user_id": user_id,
-        "expires_at": (datetime.utcnow() + timedelta(days=REFRESH_TOKEN_EXPIRE_DAYS)).isoformat()
-    }).execute()
+    try:
+        hashed_token = hash_refresh_token(refresh_token)
+        supabase.table("refresh_tokens").insert({
+            "hashed_token": hashed_token,
+            "user_id": user_id,
+            "expires_at": (datetime.utcnow() + timedelta(days=REFRESH_TOKEN_EXPIRE_DAYS)).isoformat()
+        }).execute()
+    except Exception as e:
+        print(f"Error storing refresh token: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Failed to store refresh token: {str(e)}")
     
     # Store questionnaire data linked to the user
-    supabase.table("questionnaires").insert({
-        "user_id": user_id,
-        **user.questionnaireData
-    }).execute()
+    try:
+        supabase.table("questionnaires").insert({
+            "user_id": user_id,
+            **user.questionnaireData
+        }).execute()
+    except Exception as e:
+        print(f"Error storing questionnaire: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Failed to store questionnaire: {str(e)}")
     
     return {
         "access_token": access_token,
@@ -217,33 +247,49 @@ async def signup(user: UserSignup):
 @app.post("/auth/login", response_model=Token)
 async def login(user: UserLogin):
     try:
+        print(f"Attempting login for: {user.email}")
         auth_response = supabase.auth.sign_in_with_password({
             "email": user.email,
             "password": user.password,
         })
+        print(f"Login auth response: {auth_response}")
     except Exception as e:
+        print(f"Login error: {str(e)}")
         raise HTTPException(status_code=401, detail="Invalid email or password")
     
     # Get the user id from the auth response
-    user_id = auth_response.user.id
+    try:
+        user_id = auth_response.user.id
+        print(f"User ID from login: {user_id}")
+    except Exception as e:
+        print(f"Error getting user ID from login: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Failed to get user ID: {str(e)}")
     
     # Create access and refresh tokens
-    access_token_expires = timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
-    access_token = create_access_token(
-        data={"sub": user.email, "user_id": user_id}, expires_delta=access_token_expires
-    )
-    
-    refresh_token = create_refresh_token(
-        data={"sub": user.email, "user_id": user_id}, expires_delta=timedelta(days=REFRESH_TOKEN_EXPIRE_DAYS)
-    )
+    try:
+        access_token_expires = timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
+        access_token = create_access_token(
+            data={"sub": user.email, "user_id": user_id}, expires_delta=access_token_expires
+        )
+        
+        refresh_token = create_refresh_token(
+            data={"sub": user.email, "user_id": user_id}, expires_delta=timedelta(days=REFRESH_TOKEN_EXPIRE_DAYS)
+        )
+    except Exception as e:
+        print(f"Error creating tokens for login: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Failed to create tokens: {str(e)}")
     
     # Store hashed refresh token in database
-    hashed_token = hash_refresh_token(refresh_token)
-    supabase.table("refresh_tokens").insert({
-        "hashed_token": hashed_token,
-        "user_id": user_id,
-        "expires_at": (datetime.utcnow() + timedelta(days=REFRESH_TOKEN_EXPIRE_DAYS)).isoformat()
-    }).execute()
+    try:
+        hashed_token = hash_refresh_token(refresh_token)
+        supabase.table("refresh_tokens").insert({
+            "hashed_token": hashed_token,
+            "user_id": user_id,
+            "expires_at": (datetime.utcnow() + timedelta(days=REFRESH_TOKEN_EXPIRE_DAYS)).isoformat()
+        }).execute()
+    except Exception as e:
+        print(f"Error storing refresh token for login: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Failed to store refresh token: {str(e)}")
     
     return {
         "access_token": access_token,
@@ -644,7 +690,30 @@ async def delete_user_account(current_user: dict = Depends(get_current_user)):
     
     return {"message": "Account deleted successfully"}
 
-# Health check
+# Health check with detailed diagnostics
 @app.get("/health")
 async def health_check():
-    return {"status": "ok"}
+    diagnostics = {
+        "status": "ok",
+        "environment": {
+            "SUPABASE_URL": "SET" if supabase_url else "NOT SET",
+            "SUPABASE_SERVICE_ROLE_KEY": "SET" if supabase_service_key else "NOT SET",
+            "JWT_SECRET_KEY": "SET" if os.getenv("JWT_SECRET_KEY") else "NOT SET"
+        }
+    }
+    
+    # Test Supabase connection if we have the credentials
+    if supabase_url and supabase_service_key:
+        try:
+            # Simple test query
+            result = supabase.table("exercises").select("count", count="exact").limit(1).execute()
+            diagnostics["supabase_connection"] = "OK"
+            diagnostics["exercises_count"] = result.count
+        except Exception as e:
+            diagnostics["supabase_connection"] = f"ERROR: {str(e)}"
+            diagnostics["status"] = "degraded"
+    else:
+        diagnostics["supabase_connection"] = "SKIPPED (missing credentials)"
+        diagnostics["status"] = "degraded"
+    
+    return diagnostics
