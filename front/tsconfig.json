@@ -14,12 +14,11 @@
     "noEmit": true,
     "esModuleInterop": true,
     "jsx": "react-jsx",
-    "types": ["vite/client"],
+    "types": ["vite/client", "node"],
 
-    /* Silence deprecation warning & direct alias */
-    "ignoreDeprecations": "5.0",
+    /* Path mapping for React Native Web */
     "paths": {
-      "react-native": ["./node_modules/react-native-web", "./node_modules/@types/react-native"]
+      "react-native": ["node_modules/react-native-web", "node_modules/@types/react-native"]
     }
   },
   "include": ["src"],
