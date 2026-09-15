@@ -2,10 +2,10 @@
   "version": 2,
   "builds": [
     {
-      "src": "front/vite.config.ts",
+      "src": "front/",
       "use": "@vercel/static-build",
       "config": {
-        "distDir": "front/dist"
+        "distDir": "dist"
       }
     },
     {
