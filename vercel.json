@@ -1,6 +1,6 @@
 {
   "version": 2,
-  "buildCommand": "npm install --prefix front && npm run build --prefix front && pip install --user -r back/requirements.txt",
+  "buildCommand": "npm install --prefix front && npm run build --prefix front && pip install --user --break-system-packages -r back/requirements.txt",
   "outputDirectory": "front/dist",
   "rewrites": [
     { "source": "/api/(.*)", "destination": "/api/index.py" }
