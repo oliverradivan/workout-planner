@@ -5,7 +5,7 @@ import { createNativeStackNavigator } from '@react-navigation/native-stack'
 import { QuestionnaireScreen } from './screens/QuestionnaireScreen'
 import { WorkoutPreviewScreen } from './screens/WorkoutPreviewScreen'
 import { SignUpScreen } from './screens/SignUpScreen'
-import { HomeScreen } from './screens/HomeScreen
+import { HomeScreen } from './screens/HomeScreen'
 import { WorkoutScreen } from './screens/WorkoutScreen'
 import { WorkoutWeekScreen } from './screens/WorkoutWeekScreen'
 import { PrivacyPolicyScreen } from './screens/PrivacyPolicyScreen'
