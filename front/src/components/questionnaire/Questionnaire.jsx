@@ -36,21 +36,43 @@ const Questionnaire = () => {
     }));
   };
 
+  const validateStep = () => {
+    if (step === 1) {
+      return !!answers.goal;
+    }
+    if (step === 2) {
+      return !!answers.age && !!answers.weight && !!answers.gender;
+    }
+    if (step === 3) {
+      return !!answers.training_days_per_week && !!answers.training_location;
+    }
+    return true;
+  };
+
   const handleNext = () => {
-    // Basic validation
-    if (!answers.goal || !answers.age || !answers.weight || !answers.gender || !answers.training_days_per_week || !answers.training_location) {
+    setError('');
+
+    if (!validateStep()) {
       setError('Please fill in all required fields');
       return;
     }
+
     if (step < 3) {
       setStep(step + 1);
-    } else {
-      // All steps done, proceed to preview
-      navigate('/preview', { state: { answers, consent } });
+      return;
     }
+
+    // Step 3: also require consent before proceeding to preview
+    if (!consent.privacy || !consent.terms) {
+      setError('Please accept both the privacy policy and terms to continue');
+      return;
+    }
+
+    navigate('/preview', { state: { answers, consent } });
   };
 
   const handleBack = () => {
+    setError('');
     if (step > 1) {
       setStep(step - 1);
     }
@@ -157,11 +179,9 @@ const Questionnaire = () => {
           </button>
         )}
         {step === 3 && (
-          <>
-            <button onClick={handleNext} className="button" disabled={loading}>
-              {loading ? 'See Preview...' : 'See Preview'}
-            </button>
-          </>
+          <button onClick={handleNext} className="button" disabled={loading}>
+            {loading ? 'See Preview...' : 'See Preview'}
+          </button>
         )}
       </div>
       {step === 3 && (
@@ -170,8 +190,9 @@ const Questionnaire = () => {
             <label>
               <input
                 type="checkbox"
+                name="privacy"
                 checked={consent.privacy}
-                onChange={e => setConsent(prev => ({ ...prev, privacy: e.target.checked }))}
+                onChange={handleConsentChange}
               />
               I agree to the Privacy Policy
             </label>
@@ -180,13 +201,14 @@ const Questionnaire = () => {
             <label>
               <input
                 type="checkbox"
+                name="terms"
                 checked={consent.terms}
-                onChange={e => setConsent(prev => ({ ...prev, terms: e.target.checked }))}
+                onChange={handleConsentChange}
               />
               I agree to the Terms of Service
             </label>
           </div>
-          {!consent.privacy || !consent.terms && (
+          {(!consent.privacy || !consent.terms) && (
             <p style={{ color: 'red', fontSize: '0.8em' }}>Please accept both privacy policy and terms to continue</p>
           )}
         </div>
