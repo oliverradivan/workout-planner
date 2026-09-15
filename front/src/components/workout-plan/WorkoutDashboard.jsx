@@ -186,7 +186,7 @@ const WorkoutDashboard = () => {
                   {!todayWorkout.is_completed && (
                     <button onClick={handleCompleteWorkout} className="button">
                       Mark as Complete
-                    }
+                    </button>
                   )}
                   {todayWorkout.is_completed && (
                     <p style={{ color: 'green' }}>Completed on {new Date(todayWorkout.completed_at).toLocaleDateString()}</p>
@@ -214,9 +214,9 @@ const WorkoutDashboard = () => {
                 </div>
               ))}
             </div>
-          </>
-        )}
-      </main>
+          </main>
+        </>
+      )}
     </div>
   );
 };
