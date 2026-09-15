@@ -8,6 +8,8 @@ import { SignUpScreen } from './screens/SignUpScreen'
 import { HomeScreen } from './screens/HomeScreen'
 import { WorkoutScreen } from './screens/WorkoutScreen'
 import { WorkoutWeekScreen } from './screens/WorkoutWeekScreen'
+import { PrivacyPolicyScreen } from './screens/PrivacyPolicyScreen'
+import { TermsOfServiceScreen } from './screens/TermsOfServiceScreen'
 
 type RootStackParamList = {
   Questionnaire: undefined
@@ -16,6 +18,8 @@ type RootStackParamList = {
   Home: undefined
   Workout: { date: string }
   Week: undefined
+  Privacy: undefined
+  Terms: undefined
 }
 
 const Stack = createNativeStackNavigator<RootStackParamList>()
@@ -30,6 +34,8 @@ export const App = () => {
         <Stack.Screen name="Home" component={HomeScreen} />
         <Stack.Screen name="Workout" component={WorkoutScreen} />
         <Stack.Screen name="Week" component={WorkoutWeekScreen} />
+        <Stack.Screen name="Privacy" component={PrivacyPolicyScreen} />
+        <Stack.Screen name="Terms" component={TermsOfServiceScreen} />
       </Stack.Navigator>
     </NavigationContainer>
   )

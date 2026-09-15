@@ -22,8 +22,6 @@ export const SignUpScreen = () => {
     setLoading(true)
     setError(null)
     try {
-      // In a real app, we would call our backend API
-      // For now, we'll simulate
       const response = await fetch(`${import.meta.env.VITE_API_URL}/auth/signup`, {
         method: 'POST',
         headers: {
@@ -36,13 +34,16 @@ export const SignUpScreen = () => {
       })
 
       if (!response.ok) {
-        throw new Error('Sign up failed')
+        const errorData = await response.json()
+        throw new Error(errorData.detail || 'Sign up failed')
       }
 
       const data = await response.json()
-      // Assume we get a token back
-      // Store token securely (e.g., in SecureStore)
-      // For now, we'll just navigate to home
+      // Store tokens securely (in a real app, use SecureStore or similar)
+      // For now, we'll just store in localStorage for demo purposes
+      localStorage.setItem('access_token', data.access_token)
+      localStorage.setItem('refresh_token', data.refresh_token)
+      
       navigation.replace('Home')
     } catch (err: any) {
       setError(err.message || 'An error occurred')
@@ -112,7 +113,7 @@ export const SignUpScreen = () => {
       
       <Text style={styles.footer}>
         Already have an account?{' '}
-        {/* We don't have a login screen yet, but we could navigate to one */}
+        // We don't have a login screen yet, but we could navigate to one
       </Text>
     </View>
   )

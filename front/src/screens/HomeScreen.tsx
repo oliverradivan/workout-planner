@@ -9,32 +9,79 @@ export const HomeScreen = () => {
   const [error, setError] = useState<string | null>(null)
 
   useEffect(() => {
-    // Fetch today's workout from backend
-    // For now, simulate
-    setTimeout(() => {
-      setTodayWorkout({
-        day: 1,
-        date: '2024-01-15',
-        workoutName: 'Upper Body A',
-        exercises: [
-          { name: 'Bench Press', sets: 4, reps: '8-10' },
-          { name: 'Bent-over Rows', sets: 4, reps: '8-10' },
-          { name: 'Shoulder Press', sets: 3, reps: '10-12' },
-          { name: 'Bicep Curls', sets: 3, reps: '12-15' },
-          { name: 'Tricep Extensions', sets: 3, reps: '12-15' }
-        ]
-      })
-      setLoading(false)
-    }, 1000)
+    const fetchTodayWorkout = async () => {
+      try {
+        const planId = localStorage.getItem('workout_plan_id')
+        if (!planId) {
+          // If no plan id, we can't fetch the workout
+          setTodayWorkout(null)
+          setLoading(false)
+          return
+        }
+
+        const response = await fetch(`${import.meta.env.VITE_API_URL}/workouts/by-date?plan_id=${planId}&date=${new Date().toISOString().split('T')[0]}`, {
+          method: 'GET',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${localStorage.getItem('access_token')}`
+          }
+        })
+
+        if (!response.ok) {
+          throw new Error('Failed to fetch today\'s workout')
+        }
+
+        const data = await response.json()
+        setTodayWorkout(data)
+      } catch (err: any) {
+        setError(err.message || 'An error occurred')
+      } finally {
+        setLoading(false)
+      }
+    }
+
+    fetchTodayWorkout()
   }, [])
 
   const handleViewWeek = () => {
     navigation.navigate('Week')
   }
 
-  const handleMarkComplete = () => {
-    // Mark workout as complete via backend
-    alert('Workout marked as complete!')
+  const handleMarkComplete = async () => {
+    if (!todayWorkout) return
+
+    try {
+      const planId = localStorage.getItem('workout_plan_id')
+      if (!planId) {
+        throw new Error('No workout plan found')
+      }
+
+      const response = await fetch(`${import.meta.env.VITE_API_URL}/workouts/log`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${localStorage.getItem('access_token')}`
+        },
+        body: JSON.stringify({
+          workout_plan_id: parseInt(planId),
+          day_date: todayWorkout.date,
+          completed: true
+        })
+      })
+
+      if (!response.ok) {
+        throw new Error('Failed to mark workout as complete')
+      }
+
+      // Update local state to reflect completion
+      setTodayWorkout(prev => ({
+        ...prev,
+        completed: true
+      }))
+      alert('Workout marked as complete!')
+    } catch (err: any) {
+      alert(err.message || 'Failed to mark workout as complete')
+    }
   }
 
   if (loading) {
@@ -50,8 +97,8 @@ export const HomeScreen = () => {
     return (
       <View style={styles.container}>
         <Text style={styles.error}>{error}</Text>
-        <Button title="Retry" onPress={() => { /* refetch */ }} />
-      </View>
+        <Button title="Retry" onPress={fetchTodayWorkout} />
+      )
     )
   }
 
@@ -61,7 +108,7 @@ export const HomeScreen = () => {
       <Text style={styles.date}>{todayWorkout?.date}</Text>
       
       <View style={styles.workoutCard}>
-        <Text style={styles.workoutName}>{todayWorkout?.workoutName}</Text>
+        <Text style={styles.workoutName}>{todayWorkout?.workout_name}</Text>
         
         <FlatList
           data={todayWorkout?.exercises || []}
@@ -77,8 +124,15 @@ export const HomeScreen = () => {
         />
       </View>
       
-      <Button title="Mark as Complete" onPress={handleMarkComplete} />
-      <Button title="View This Week" onPress={handleViewWeek} />
+      <View style={styles.buttonContainer}>
+        <Button title="Mark as Complete" onPress={handleMarkComplete} />
+        <Button title="View This Week" onPress={handleViewWeek} />
+      </View>
+      
+      <View style={styles.linkContainer}>
+        <Button title="Privacy Policy" onPress={() => navigation.navigate('Privacy')} />
+        <Button title="Terms of Service" onPress={() => navigation.navigate('Terms')} />
+      </View>
     </View>
   )
 }
@@ -123,13 +177,19 @@ const styles = StyleSheet.create({
   exerciseName: {
     fontSize: 16,
     fontWeight: '500',
+    marginBottom: 4,
   },
   exerciseDetails: {
     fontSize: 14,
     color: '#666',
   },
-  margin: {
-    marginTop: 12,
+  buttonContainer: {
+    flexDirection: 'row',
+    justifyContent: 'space-around',
+    marginTop: 20,
+  },
+  linkContainer: {
+    marginTop: 20,
   },
   error: {
     color: 'red',

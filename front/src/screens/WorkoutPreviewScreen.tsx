@@ -1,5 +1,5 @@
 import React from 'react'
-import { View, Text, StyleSheet, Button, ActivityIndicator } from 'react-native'
+import { View, Text, StyleSheet, Button, ActivityIndicator, FlatList } from 'react-native'
 import { useRoute, useNavigation } from '@react-navigation/native'
 
 export const WorkoutPreviewScreen = () => {
@@ -7,26 +7,45 @@ export const WorkoutPreviewScreen = () => {
   const navigation = useNavigation()
   const { questionnaireData } = route.params as { questionnaireData: any }
 
-  // In a real app, we would call the backend to generate a preview
-  // For now, we'll show a placeholder
   const [preview, setPreview] = React.useState(null)
+  const [planId, setPlanId] = React.useState<number | null>(null)
   const [loading, setLoading] = React.useState(true)
+  const [error, setError] = useState<string | null>(null)
 
   React.useEffect(() => {
-    // Simulate API call
-    setTimeout(() => {
-      setPreview({
-        day: 1,
-        workoutName: 'Full Body Beginner',
-        exercises: [
-          { name: 'Push-ups', sets: 3, reps: '10-15' },
-          { name: 'Squats', sets: 3, reps: '12-20' },
-          { name: 'Plank', sets: 3, reps: '30-60s' }
-        ]
-      })
-      setLoading(false)
-    }, 1000)
-  }, [])
+    const generatePreview = async () => {
+      try {
+        const response = await fetch(`${import.meta.env.VITE_API_URL}/workouts/generate`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${localStorage.getItem('access_token')}`
+          },
+          body: JSON.stringify(questionnaireData)
+        })
+
+        if (!response.ok) {
+          throw new Error('Failed to generate workout preview')
+        }
+
+        const data = await response.json()
+        // Store the plan id
+        setPlanId(data.plan_id)
+        localStorage.setItem('workout_plan_id', data.plan_id.toString())
+        
+        // We'll take the first week (first 7 days) or however many days per week
+        const daysPerWeek = questionnaireData.days_per_week || 3
+        const previewData = data.plan.slice(0, daysPerWeek)
+        setPreview(previewData)
+      } catch (err: any) {
+        setError(err.message || 'An error occurred')
+      } finally {
+        setLoading(false)
+      }
+    }
+
+    generatePreview()
+  }, [questionnaireData])
 
   const handleSignUp = () => {
     navigation.navigate('SignUp', { questionnaireData })
@@ -41,17 +60,43 @@ export const WorkoutPreviewScreen = () => {
     )
   }
 
+  if (error) {
+    return (
+      <View style={styles.container}>
+        <Text style={styles.error}>{error}</Text>
+        <Button title="Retry" onPress={() => { /* trigger refresh */ }} />
+      </View>
+    )
+  }
+
+  if (!preview) {
+    return (
+      <View style={styles.container}>
+        <Text style={styles.margin}>No preview data available</Text>
+      </View>
+    )
+  }
+
   return (
     <View style={styles.container}>
       <Text style={styles.title}>Your Workout Preview</Text>
-      <Text style={styles.subtitle}>Day 1: {preview?.workoutName}</Text>
+      <Text style={styles.subtitle}>First {preview.length} days</Text>
       
-      {preview?.exercises.map((ex: any, index: number) => (
-        <View key={index} style={styles.exercise}>
-          <Text style={styles.exerciseName}>{ex.name}</Text>
-          <Text style={styles.exerciseDetails}>
-            {ex.sets} sets × {ex.reps} reps
-          </Text>
+      {preview.map((day: any, dayIndex: number) => (
+        <View key={day.day} style={styles.dayContainer}>
+          <Text style={styles.dayTitle}>Day {day.day}: {day.workout_name}</Text>
+          <FlatList
+            data={day.exercises}
+            keyExtractor={(item, index) => index.toString()}
+            renderItem={({ item }) => (
+              <View style={styles.exercise}>
+                <Text style={styles.exerciseName}>{item.name}</Text>
+                <Text style={styles.exerciseDetails}>
+                  {item.sets} sets × {item.reps} reps
+                </Text>
+              </View>
+            )}
+          />
         </View>
       ))}
       
@@ -63,8 +108,6 @@ export const WorkoutPreviewScreen = () => {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
     padding: 20,
   },
   title: {
@@ -76,16 +119,25 @@ const styles = StyleSheet.create({
     fontSize: 18,
     marginBottom: 30,
   },
-  exercise: {
+  dayContainer: {
     backgroundColor: '#f0f0f0',
     padding: 15,
     borderRadius: 8,
     marginVertical: 8,
-    width: '100%',
+  },
+  dayTitle: {
+    fontSize: 18,
+    fontWeight: '600',
+    marginBottom: 10,
+  },
+  exercise: {
+    paddingVertical: 8,
+    borderBottomWidth: 1,
+    borderBottomColor: '#ddd',
   },
   exerciseName: {
     fontSize: 16,
-    fontWeight: '600',
+    fontWeight: '500',
     marginBottom: 4,
   },
   exerciseDetails: {
@@ -95,4 +147,9 @@ const styles = StyleSheet.create({
   margin: {
     marginTop: 12,
   },
+  error: {
+    color: 'red',
+    textAlign: 'center',
+    marginBottom: 20,
+  }
 })

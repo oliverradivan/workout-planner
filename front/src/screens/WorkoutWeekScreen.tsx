@@ -1,17 +1,72 @@
-import React from 'react'
-import { View, Text, StyleSheet, FlatList } from 'react-native'
+import React, { useState, useEffect } from 'react'
+import { View, Text, StyleSheet, ActivityIndicator, FlatList } from 'react-native'
 
 export const WorkoutWeekScreen = () => {
-  // In a real app, we would fetch the week's workouts from backend
-  const weekWorkouts = [
-    { day: 1, date: '2024-01-15', workoutName: 'Upper Body A', completed: true },
-    { day: 2, date: '2024-01-16', workoutName: 'Lower Body A', completed: false },
-    { day: 3, date: '2024-01-17', workoutName: 'Rest or Active Recovery', completed: false },
-    { day: 4, date: '2024-01-18', workoutName: 'Upper Body B', completed: false },
-    { day: 5, date: '2024-01-19', workoutName: 'Lower Body B', completed: false },
-    { day: 6, date: '2024-01-20', workoutName: 'Full Body', completed: false },
-    { day: 7, date: '2024-01-21', workoutName: 'Rest', completed: false },
-  ]
+  const [weekWorkouts, setWeekWorkouts] = useState([])
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
+
+  useEffect(() => {
+    const fetchWeekWorkouts = async () => {
+      try {
+        // We'll create an endpoint to get the week's workouts for the user's plan
+        // For now, we'll simulate by generating a week's worth of data from the today endpoint multiple times
+        // In a real app, we would have an endpoint like /workouts/week
+        const response = await fetch(`${import.meta.env.VITE_API_URL}/workouts/today`, {
+          method: 'GET',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${localStorage.getItem('access_token')}`
+          }
+        })
+
+        if (!response.ok) {
+          throw new Error('Failed to fetch week\'s workouts')
+        }
+
+        const todayWorkout = await response.json()
+        // We'll create a week's worth of workouts by shifting the date
+        const weekWorkouts = []
+        for (let i = 0; i < 7; i++) {
+          const date = new Date()
+          date.setDate(date.getDate() + i)
+          const dateString = date.toISOString().split('T')[0]
+          weekWorkouts.push({
+            day: i + 1,
+            date: dateString,
+            workout_name: todayWorkout.workout_name, // In reality, this would vary by day
+            completed: false // We would check the logs for completion
+          })
+        }
+
+        setWeekWorkouts(weekWorkouts)
+      } catch (err: any) {
+        setError(err.message || 'An error occurred')
+      } finally {
+        setLoading(false)
+      }
+    }
+
+    fetchWeekWorkouts()
+  }, [])
+
+  if (loading) {
+    return (
+      <View style={styles.container}>
+        <ActivityIndicator size="large" />
+        <Text style={styles.margin}>Loading week's workouts...</Text>
+      </View>
+    )
+  }
+
+  if (error) {
+    return (
+      <View style={styles.container}>
+        <Text style={styles.error}>{error}</Text>
+        <Button title="Retry" onPress={() => { /* refetch */ }} />
+      </View>
+    )
+  }
 
   return (
     <View style={styles.container}>
@@ -22,7 +77,7 @@ export const WorkoutWeekScreen = () => {
         renderItem={({ item }) => (
           <View style={styles.workoutItem}>
             <Text style={styles.date}>{item.date}</Text>
-            <Text style={styles.workoutName}>{item.workoutName}</Text>
+            <Text style={styles.workoutName}>{item.workout_name}</Text>
             {item.completed ? (
               <Text style={styles.completed}>Completed</Text>
             ) : (

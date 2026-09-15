@@ -11,6 +11,15 @@ CREATE TABLE IF NOT EXISTS public.exercises (
     created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
 );
 
+-- Create refresh_tokens table
+CREATE TABLE IF NOT EXISTS public.refresh_tokens (
+    id SERIAL PRIMARY KEY,
+    hashed_token VARCHAR(255) NOT NULL UNIQUE,
+    user_id UUID REFERENCES auth.users(id) NOT NULL,
+    expires_at TIMESTAMP WITH TIME ZONE NOT NULL,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+);
+
 -- Create questionnaires table to store onboarding data
 CREATE TABLE IF NOT EXISTS public.questionnaires (
     id SERIAL PRIMARY KEY,
@@ -48,6 +57,7 @@ CREATE TABLE IF NOT EXISTS public.workout_logs (
 
 -- Enable row level security for all tables (optional but recommended)
 ALTER TABLE public.exercises ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.refresh_tokens ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.questionnaires ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.workout_plans ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.workout_logs ENABLE ROW LEVEL SECURITY;
@@ -73,6 +83,18 @@ CREATE POLICY "Users can view their own workout logs" ON public.workout_logs
 
 CREATE POLICY "Users can insert their own workout logs" ON public.workout_logs
     FOR INSERT WITH CHECK (auth.uid() = user_id);
+
+CREATE POLICY "Users can view their own refresh tokens" ON public.refresh_tokens
+    FOR SELECT USING (auth.uid() = user_id);
+
+CREATE POLICY "Users can insert their own refresh tokens" ON public.refresh_tokens
+    FOR INSERT WITH CHECK (auth.uid() = user_id);
+
+CREATE POLICY "Users can update their own refresh tokens" ON public.refresh_tokens
+    FOR UPDATE USING (auth.uid() = user_id);
+
+CREATE POLICY "Users can delete their own refresh tokens" ON public.refresh_tokens
+    FOR DELETE USING (auth.uid() = user_id);
 
 -- Exercises can be viewed by everyone (since they are public data)
 CREATE POLICY "Anyone can view exercises" ON public.exercises

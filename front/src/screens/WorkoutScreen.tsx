@@ -1,5 +1,5 @@
-import React, { useState } from 'react'
-import { View, Text, StyleSheet, Button, ActivityIndicator } from 'react-native'
+import React, { useState, useEffect } from 'react'
+import { View, Text, StyleSheet, Button, ActivityIndicator, FlatList } from 'react-native'
 import { useRoute, useNavigation } from '@react-navigation/native'
 
 export const WorkoutScreen = () => {
@@ -11,30 +11,73 @@ export const WorkoutScreen = () => {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
 
-  // In a real app, we would fetch the workout for the given date from backend
-  React.useEffect(() => {
-    // Simulate
-    setTimeout(() => {
-      setWorkout({
-        day: 3,
-        date: date,
-        workoutName: 'Lower Body B',
-        exercises: [
-          { name: 'Squats', sets: 4, reps: '8-10' },
-          { name: 'Deadlifts', sets: 3, reps: '6-8' },
-          { name: 'Leg Press', sets: 3, reps: '10-12' },
-          { name: 'Leg Curls', sets: 3, reps: '12-15' },
-          { name: 'Calf Raises', sets: 4, reps: '15-20' }
-        ]
-      })
-      setLoading(false)
-    }, 1000)
+  useEffect(() => {
+    const fetchWorkout = async () => {
+      try {
+        const planId = localStorage.getItem('workout_plan_id')
+        if (!planId) {
+          throw new Error('No workout plan found. Please generate a plan first.')
+        }
+
+        const response = await fetch(`${import.meta.env.VITE_API_URL}/workouts/by-date?plan_id=${planId}&date=${date}`, {
+          method: 'GET',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${localStorage.getItem('access_token')}`
+          }
+        })
+
+        if (!response.ok) {
+          if (response.status === 404) {
+            throw new Error('Workout not found for the selected date')
+          } else {
+            throw new Error('Failed to fetch workout')
+          }
+        }
+
+        const data = await response.json()
+        setWorkout(data)
+      } catch (err: any) {
+        setError(err.message || 'An error occurred')
+      } finally {
+        setLoading(false)
+      }
+    }
+
+    fetchWorkout()
   }, [date])
 
-  const handleMarkComplete = () => {
-    // Call backend to mark as complete
-    alert('Workout marked as complete!')
-    navigation.goBack()
+  const handleMarkComplete = async () => {
+    if (!workout) return
+
+    try {
+      const planId = localStorage.getItem('workout_plan_id')
+      if (!planId) {
+        throw new Error('No workout plan found')
+      }
+
+      const response = await fetch(`${import.meta.env.VITE_API_URL}/workouts/log`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${localStorage.getItem('access_token')}`
+        },
+        body: JSON.stringify({
+          workout_plan_id: parseInt(planId),
+          day_date: workout.date,
+          completed: true
+        })
+      })
+
+      if (!response.ok) {
+        throw new Error('Failed to mark workout as complete')
+      }
+
+      alert('Workout marked as complete!')
+      navigation.goBack()
+    } catch (err: any) {
+      alert(err.message || 'Failed to mark workout as complete')
+    }
   }
 
   if (loading) {
@@ -58,17 +101,21 @@ export const WorkoutScreen = () => {
   return (
     <View style={styles.container}>
       <Text style={styles.title}>Workout for {workout?.date}</Text>
-      <Text style={styles.subtitle}>{workout?.workoutName}</Text>
+      <Text style={styles.subtitle}>{workout?.workout_name}</Text>
       
       <View style={styles.workoutCard}>
-        {workout?.exercises.map((ex: any, index: number) => (
-          <View key={index} style={styles.exercise}>
-            <Text style={styles.exerciseName}>{ex.name}</Text>
-            <Text style={styles.exerciseDetails}>
-              {ex.sets} sets × {ex.reps} reps
-            </Text>
-          </View>
-        ))}
+        <FlatList
+          data={workout?.exercises || []}
+          keyExtractor={(item, index) => index.toString()}
+          renderItem={({ item }) => (
+            <View style={styles.exercise}>
+              <Text style={styles.exerciseName}>{item.name}</Text>
+              <Text style={styles.exerciseDetails}>
+                {item.sets} sets × {item.reps} reps
+              </Text>
+            </View>
+          )}
+        />
       </View>
       
       <Button title="Mark as Complete" onPress={handleMarkComplete} />
