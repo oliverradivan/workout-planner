@@ -1,10 +1,11 @@
 import React, { useState, useEffect } from 'react'
 import { View, Text, StyleSheet, Button, ActivityIndicator, FlatList } from 'react-native'
 import { useRoute, useNavigation } from '@react-navigation/native'
+import { RootStackParamList } from '../App'
 
 export const WorkoutScreen = () => {
-  const route = useRoute<{ date: string }>()
-  const navigation = useNavigation()
+  const route = useRoute<RootStackParamList>()
+  const navigation = useNavigation<RootStackParamList>()
   const { date } = route.params
 
   const [workout, setWorkout] = useState(null)

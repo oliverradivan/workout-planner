@@ -1,9 +1,10 @@
 import React from 'react'
 import { View, Text, StyleSheet, Button } from 'react-native'
 import { useNavigation } from '@react-navigation/native'
+import { RootStackParamList } from '../App'
 
 export const PrivacyPolicyScreen = () => {
-  const navigation = useNavigation()
+  const navigation = useNavigation<RootStackParamList>()
 
   return (
     <View style={styles.container}>
