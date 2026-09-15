@@ -24,7 +24,7 @@
     },
     {
       "src": "/(.*)",
-      "dest": "/front/index.html"
+      "dest": "/front/dist/index.html"
     }
   ]
 }
