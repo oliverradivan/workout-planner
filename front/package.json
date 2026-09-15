@@ -16,6 +16,7 @@
     "react-native-web": "^0.19.13"
   },
   "devDependencies": {
+    "@originjs/vite-plugin-commonjs": "^1.0.3",
     "@types/react": "^18.3.31",
     "@types/react-dom": "^18.3.7",
     "@types/react-native": "^0.72.8",
