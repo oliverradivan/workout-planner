@@ -1,9 +1,10 @@
 import React, { useState, useEffect } from 'react'
 import { View, Text, StyleSheet, Button, ActivityIndicator, FlatList } from 'react-native'
 import { useNavigation } from '@react-navigation/native'
+import { RootStackParamList } from '../App'
 
 export const HomeScreen = () => {
-  const navigation = useNavigation()
+  const navigation = useNavigation<RootStackParamList>()
   const [todayWorkout, setTodayWorkout] = useState(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)

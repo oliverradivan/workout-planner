@@ -1,9 +1,10 @@
 import React, { useState } from 'react'
 import { View, Text, TextInput, Picker, Button, StyleSheet, ScrollView } from 'react-native'
 import { useNavigation } from '@react-navigation/native'
+import { RootStackParamList } from '../App'
 
 export const QuestionnaireScreen = () => {
-  const navigation = useNavigation()
+  const navigation = useNavigation<RootStackParamList>()
   const [formData, setFormData] = useState({
     goal: '',
     age: '',

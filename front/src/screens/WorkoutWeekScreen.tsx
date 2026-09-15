@@ -1,8 +1,15 @@
 import React, { useState, useEffect } from 'react'
 import { View, Text, StyleSheet, ActivityIndicator, FlatList, Button } from 'react-native'
 
+interface WeekWorkout {
+  day: number
+  date: string
+  workout_name: string
+  completed: boolean
+}
+
 export const WorkoutWeekScreen = () => {
-  const [weekWorkouts, setWeekWorkouts] = useState([])
+  const [weekWorkouts, setWeekWorkouts] = useState<WeekWorkout[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
 
@@ -26,7 +33,7 @@ export const WorkoutWeekScreen = () => {
 
         const todayWorkout = await response.json()
         // We'll create a week's worth of workouts by shifting the date
-        const weekWorkouts = []
+        const weekWorkouts: WeekWorkout[] = []
         for (let i = 0; i < 7; i++) {
           const date = new Date()
           date.setDate(date.getDate() + i)
@@ -100,6 +107,14 @@ const styles = StyleSheet.create({
     fontSize: 24,
     fontWeight: 'bold',
     marginBottom: 20,
+  },
+  margin: {
+    marginTop: 10,
+  },
+  error: {
+    color: 'red',
+    fontSize: 16,
+    marginBottom: 10,
   },
   workoutItem: {
     backgroundColor: '#fff',

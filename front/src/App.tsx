@@ -5,16 +5,16 @@ import { createNativeStackNavigator } from '@react-navigation/native-stack'
 import { QuestionnaireScreen } from './screens/QuestionnaireScreen'
 import { WorkoutPreviewScreen } from './screens/WorkoutPreviewScreen'
 import { SignUpScreen } from './screens/SignUpScreen'
-import { HomeScreen } from './screens/HomeScreen'
+import { HomeScreen } from './screens/HomeScreen
 import { WorkoutScreen } from './screens/WorkoutScreen'
 import { WorkoutWeekScreen } from './screens/WorkoutWeekScreen'
 import { PrivacyPolicyScreen } from './screens/PrivacyPolicyScreen'
 import { TermsOfServiceScreen } from './screens/TermsOfServiceScreen'
 
-type RootStackParamList = {
+export type RootStackParamList = {
   Questionnaire: undefined
-  Preview: undefined
-  SignUp: undefined
+  Preview: { questionnaireData: any }
+  SignUp: { questionnaireData: any }
   Home: undefined
   Workout: { date: string }
   Week: undefined

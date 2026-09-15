@@ -1,11 +1,12 @@
 import React, { useState } from 'react'
 import { View, Text, TextInput, Button, StyleSheet, ActivityIndicator, CheckBox, Switch } from 'react-native'
 import { useRoute, useNavigation } from '@react-navigation/native'
+import { RootStackParamList } from '../App'
 
 export const SignUpScreen = () => {
-  const route = useRoute()
-  const navigation = useNavigation()
-  const { questionnaireData } = route.params as { questionnaireData: any }
+  const route = useRoute<RootStackParamList>()
+  const navigation = useNavigation<RootStackParamList>()
+  const { questionnaireData } = route.params
 
   const [formData, setFormData] = useState({
     email: '',

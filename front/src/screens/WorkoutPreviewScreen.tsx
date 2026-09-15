@@ -1,11 +1,12 @@
-import React from 'react'
+import React, { useState } from 'react'
 import { View, Text, StyleSheet, Button, ActivityIndicator, FlatList } from 'react-native'
 import { useRoute, useNavigation } from '@react-navigation/native'
+import { RootStackParamList } from '../App'
 
 export const WorkoutPreviewScreen = () => {
-  const route = useRoute()
-  const navigation = useNavigation()
-  const { questionnaireData } = route.params as { questionnaireData: any }
+  const route = useRoute<RootStackParamList>()
+  const navigation = useNavigation<RootStackParamList>()
+  const { questionnaireData } = route.params
 
   const [preview, setPreview] = React.useState(null)
   const [planId, setPlanId] = React.useState<number | null>(null)
