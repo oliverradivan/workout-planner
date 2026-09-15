@@ -14,7 +14,13 @@
     "noEmit": true,
     "esModuleInterop": true,
     "jsx": "react-jsx",
-    "types": ["vite/client"]
+    "types": ["vite/client"],
+
+    /* Silence deprecation warning & direct alias */
+    "ignoreDeprecations": "5.0",
+    "paths": {
+      "react-native": ["./node_modules/react-native-web", "./node_modules/@types/react-native"]
+    }
   },
   "include": ["src"],
   "references": [{ "path": "./tsconfig.node.json" }]
