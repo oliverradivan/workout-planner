@@ -1,12 +1,33 @@
 import React, { useState } from 'react'
-import { View, Text, TextInput, Button, StyleSheet, ActivityIndicator, CheckBox, Switch } from 'react-native'
-import { useRoute, useNavigation } from '@react-navigation/native'
+import {
+  View,
+  Text,
+  TextInput,
+  Button,
+  StyleSheet,
+  ActivityIndicator,
+  Switch,
+  ScrollView,
+  Alert
+} from 'react-native'
+import { useRoute, useNavigation, RouteProp } from '@react-navigation/native'
+import { NativeStackNavigationProp } from '@react-navigation/native-stack'
+import AsyncStorage from '@react-native-async-storage/async-storage'
 import { RootStackParamList } from '../App'
 
+type SignUpRouteProp = RouteProp<RootStackParamList, 'SignUp'>
+type SignUpNavProp = NativeStackNavigationProp<RootStackParamList, 'SignUp'>
+
+declare const process: {
+  env: Record<string, string | undefined>
+}
+
 export const SignUpScreen = () => {
-  const route = useRoute<RootStackParamList>()
-  const navigation = useNavigation<RootStackParamList>()
-  const { questionnaireData } = route.params
+  const route = useRoute<SignUpRouteProp>()
+  const navigation = useNavigation<SignUpNavProp>()
+  
+  // Safe navigation fallback if route params are undefined
+  const questionnaireData = route.params?.questionnaireData
 
   const [formData, setFormData] = useState({
     email: '',
@@ -20,13 +41,20 @@ export const SignUpScreen = () => {
   const [error, setError] = useState<string | null>(null)
 
   const handleSignUp = async () => {
+    if (!formData.agreeToTerms || !formData.agreeToPrivacy) {
+      setError('You must agree to the Terms of Service and Privacy Policy.')
+      return
+    }
+
     setLoading(true)
     setError(null)
     try {
-      const response = await fetch(`${import.meta.env.VITE_API_URL}/auth/signup`, {
+      const apiUrl = process.env.EXPO_PUBLIC_API_URL || 'http://localhost:3000'
+
+      const response = await fetch(`${apiUrl}/auth/signup`, {
         method: 'POST',
         headers: {
-          'Content-Type': 'application/json',
+          'Content-Type': 'application/json'
         },
         body: JSON.stringify({
           ...formData,
@@ -40,12 +68,14 @@ export const SignUpScreen = () => {
       }
 
       const data = await response.json()
-      // Store tokens securely (in a real app, use SecureStore or similar)
-      // For now, we'll just store in localStorage for demo purposes
-      localStorage.setItem('access_token', data.access_token)
-      localStorage.setItem('refresh_token', data.refresh_token)
-      
-      navigation.replace('Home')
+
+      // Store tokens using AsyncStorage instead of localStorage
+      await AsyncStorage.setItem('access_token', data.access_token)
+      if (data.refresh_token) {
+        await AsyncStorage.setItem('refresh_token', data.refresh_token)
+      }
+
+      navigation.replace('Home' as any)
     } catch (err: any) {
       setError(err.message || 'An error occurred')
     } finally {
@@ -54,24 +84,26 @@ export const SignUpScreen = () => {
   }
 
   return (
-    <View style={styles.container}>
+    <ScrollView contentContainerStyle={styles.container}>
       <Text style={styles.title}>Create Account</Text>
-      
+
       <TextInput
         placeholder="Email"
         value={formData.email}
         onChangeText={(text) => setFormData({ ...formData, email: text })}
         autoCapitalize="none"
+        keyboardType="email-address"
         style={styles.input}
       />
-      
+
       <TextInput
         placeholder="Username (optional)"
         value={formData.username}
         onChangeText={(text) => setFormData({ ...formData, username: text })}
+        autoCapitalize="none"
         style={styles.input}
       />
-      
+
       <TextInput
         placeholder="Password"
         value={formData.password}
@@ -79,84 +111,81 @@ export const SignUpScreen = () => {
         secureTextEntry
         style={styles.input}
       />
-      
-      <View style={styles.checkboxRow}>
-        <CheckBox
+
+      <View style={styles.switchRow}>
+        <Switch
           value={formData.agreeToTerms}
           onValueChange={(value) => setFormData({ ...formData, agreeToTerms: value })}
         />
-        <Text style={styles.checkboxLabel}>
-          I agree to the Terms of Service
-        </Text>
+        <Text style={styles.switchLabel}>I agree to the Terms of Service</Text>
       </View>
-      
-      <View style={styles.checkboxRow}>
-        <CheckBox
+
+      <View style={styles.switchRow}>
+        <Switch
           value={formData.agreeToPrivacy}
           onValueChange={(value) => setFormData({ ...formData, agreeToPrivacy: value })}
         />
-        <Text style={styles.checkboxLabel}>
-          I agree to the Privacy Policy
-        </Text>
+        <Text style={styles.switchLabel}>I agree to the Privacy Policy</Text>
       </View>
-      
-      {error && (
-        <Text style={styles.error}>
-          {error}
-        </Text>
+
+      {error && <Text style={styles.error}>{error}</Text>}
+
+      {loading ? (
+        <ActivityIndicator size="large" />
+      ) : (
+        <Button
+          title="Create Account"
+          onPress={handleSignUp}
+          disabled={!formData.email || !formData.password}
+        />
       )}
-      
-      <Button
-        title={loading ? 'Creating Account...' : 'Create Account'}
-        onPress={handleSignUp}
-        disabled={loading}
-      />
-      
+
       <Text style={styles.footer}>
-        Already have an account?{' '}
-        // We don't have a login screen yet, but we could navigate to one
+        Already have an account? Log in coming soon.
       </Text>
-    </View>
+    </ScrollView>
   )
 }
 
 const styles = StyleSheet.create({
   container: {
-    flex: 1,
+    flexGrow: 1,
     justifyContent: 'center',
     padding: 20,
+    backgroundColor: '#fff'
   },
   title: {
     fontSize: 24,
     fontWeight: 'bold',
     textAlign: 'center',
-    marginBottom: 30,
+    marginBottom: 30
   },
   input: {
     borderWidth: 1,
     borderColor: '#ccc',
-    borderRadius: 4,
+    borderRadius: 6,
     padding: 12,
-    marginBottom: 16,
+    marginBottom: 16
   },
-  checkboxRow: {
+  switchRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginBottom: 20,
+    marginBottom: 16
   },
-  checkboxLabel: {
-    marginLeft: 8,
-    fontSize: 16,
+  switchLabel: {
+    marginLeft: 10,
+    fontSize: 15,
+    color: '#333'
   },
   error: {
     color: 'red',
     textAlign: 'center',
-    marginBottom: 20,
+    marginBottom: 20
   },
   footer: {
     marginTop: 30,
     textAlign: 'center',
     fontSize: 14,
-    color: '#666',
+    color: '#666'
   }
 })

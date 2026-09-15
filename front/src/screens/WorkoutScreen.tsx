@@ -1,70 +1,111 @@
-import React, { useState, useEffect } from 'react'
-import { View, Text, StyleSheet, Button, ActivityIndicator, FlatList } from 'react-native'
-import { useRoute, useNavigation } from '@react-navigation/native'
+import React, { useState, useEffect, useCallback } from 'react'
+import {
+  View,
+  Text,
+  StyleSheet,
+  Button,
+  ActivityIndicator,
+  ScrollView,
+  Alert
+} from 'react-native'
+import { useRoute, useNavigation, RouteProp } from '@react-navigation/native'
+import { NativeStackNavigationProp } from '@react-navigation/native-stack'
+import AsyncStorage from '@react-native-async-storage/async-storage'
 import { RootStackParamList } from '../App'
 
+type WorkoutRouteProp = RouteProp<RootStackParamList, 'Workout'>
+type WorkoutNavProp = NativeStackNavigationProp<RootStackParamList, 'Workout'>
+
+declare const process: {
+  env: Record<string, string | undefined>
+}
+
+interface Exercise {
+  name: string
+  sets: number
+  reps: number
+}
+
+interface WorkoutDetails {
+  date: string
+  workout_name: string
+  exercises: Exercise[]
+  completed?: boolean
+}
+
 export const WorkoutScreen = () => {
-  const route = useRoute<RootStackParamList>()
-  const navigation = useNavigation<RootStackParamList>()
+  const route = useRoute<WorkoutRouteProp>()
+  const navigation = useNavigation<WorkoutNavProp>()
   const { date } = route.params
 
-  const [workout, setWorkout] = useState(null)
+  const [workout, setWorkout] = useState<WorkoutDetails | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
 
-  useEffect(() => {
-    const fetchWorkout = async () => {
-      try {
-        const planId = localStorage.getItem('workout_plan_id')
-        if (!planId) {
-          throw new Error('No workout plan found. Please generate a plan first.')
-        }
+  const fetchWorkout = useCallback(async () => {
+    setLoading(true)
+    setError(null)
+    try {
+      const planId = await AsyncStorage.getItem('workout_plan_id')
+      if (!planId) {
+        throw new Error('No workout plan found. Please generate a plan first.')
+      }
 
-        const response = await fetch(`${import.meta.env.VITE_API_URL}/workouts/by-date?plan_id=${planId}&date=${date}`, {
+      const token = await AsyncStorage.getItem('access_token')
+      const apiUrl = process.env.EXPO_PUBLIC_API_URL || 'http://localhost:3000'
+
+      const response = await fetch(
+        `${apiUrl}/workouts/by-date?plan_id=${planId}&date=${date}`,
+        {
           method: 'GET',
           headers: {
             'Content-Type': 'application/json',
-            'Authorization': `Bearer ${localStorage.getItem('access_token')}`
-          }
-        })
-
-        if (!response.ok) {
-          if (response.status === 404) {
-            throw new Error('Workout not found for the selected date')
-          } else {
-            throw new Error('Failed to fetch workout')
+            Authorization: `Bearer ${token}`
           }
         }
+      )
 
-        const data = await response.json()
-        setWorkout(data)
-      } catch (err: any) {
-        setError(err.message || 'An error occurred')
-      } finally {
-        setLoading(false)
+      if (!response.ok) {
+        if (response.status === 404) {
+          throw new Error('Workout not found for the selected date')
+        } else {
+          throw new Error('Failed to fetch workout')
+        }
       }
-    }
 
-    fetchWorkout()
+      const data = await response.json()
+      setWorkout(data)
+    } catch (err: any) {
+      setError(err.message || 'An error occurred')
+    } finally {
+      setLoading(false)
+    }
   }, [date])
+
+  useEffect(() => {
+    fetchWorkout()
+  }, [fetchWorkout])
 
   const handleMarkComplete = async () => {
     if (!workout) return
 
     try {
-      const planId = localStorage.getItem('workout_plan_id')
+      const planId = await AsyncStorage.getItem('workout_plan_id')
       if (!planId) {
         throw new Error('No workout plan found')
       }
 
-      const response = await fetch(`${import.meta.env.VITE_API_URL}/workouts/log`, {
+      const token = await AsyncStorage.getItem('access_token')
+      const apiUrl = process.env.EXPO_PUBLIC_API_URL || 'http://localhost:3000'
+
+      const response = await fetch(`${apiUrl}/workouts/log`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'Authorization': `Bearer ${localStorage.getItem('access_token')}`
+          Authorization: `Bearer ${token}`
         },
         body: JSON.stringify({
-          workout_plan_id: parseInt(planId),
+          workout_plan_id: parseInt(planId, 10),
           day_date: workout.date,
           completed: true
         })
@@ -74,16 +115,16 @@ export const WorkoutScreen = () => {
         throw new Error('Failed to mark workout as complete')
       }
 
-      alert('Workout marked as complete!')
+      Alert.alert('Success', 'Workout marked as complete!')
       navigation.goBack()
     } catch (err: any) {
-      alert(err.message || 'Failed to mark workout as complete')
+      Alert.alert('Error', err.message || 'Failed to mark workout as complete')
     }
   }
 
   if (loading) {
     return (
-      <View style={styles.container}>
+      <View style={styles.centerContainer}>
         <ActivityIndicator size="large" />
         <Text style={styles.margin}>Loading workout...</Text>
       </View>
@@ -92,85 +133,101 @@ export const WorkoutScreen = () => {
 
   if (error) {
     return (
-      <View style={styles.container}>
+      <View style={styles.centerContainer}>
         <Text style={styles.error}>{error}</Text>
-        <Button title="Retry" onPress={() => { /* refetch */ }} />
+        <Button title="Retry" onPress={fetchWorkout} />
       </View>
     )
   }
 
   return (
-    <View style={styles.container}>
-      <Text style={styles.title}>Workout for {workout?.date}</Text>
+    <ScrollView style={styles.container} contentContainerStyle={styles.scrollContent}>
+      <Text style={styles.title}>Workout for {workout?.date || date}</Text>
       <Text style={styles.subtitle}>{workout?.workout_name}</Text>
-      
+
       <View style={styles.workoutCard}>
-        <FlatList
-          data={workout?.exercises || []}
-          keyExtractor={(item, index) => index.toString()}
-          renderItem={({ item }) => (
-            <View style={styles.exercise}>
-              <Text style={styles.exerciseName}>{item.name}</Text>
-              <Text style={styles.exerciseDetails}>
-                {item.sets} sets × {item.reps} reps
-              </Text>
-            </View>
-          )}
+        {workout?.exercises?.map((item, index) => (
+          <View key={index} style={styles.exercise}>
+            <Text style={styles.exerciseName}>{item.name}</Text>
+            <Text style={styles.exerciseDetails}>
+              {item.sets} sets × {item.reps} reps
+            </Text>
+          </View>
+        ))}
+      </View>
+
+      <View style={styles.buttonWrapper}>
+        <Button
+          title={workout?.completed ? 'Completed ✓' : 'Mark as Complete'}
+          onPress={handleMarkComplete}
+          disabled={workout?.completed}
         />
       </View>
-      
-      <Button title="Mark as Complete" onPress={handleMarkComplete} />
-    </View>
+    </ScrollView>
   )
 }
 
 const styles = StyleSheet.create({
   container: {
     flex: 1,
+    backgroundColor: '#fff'
+  },
+  scrollContent: {
+    padding: 20,
+    alignItems: 'center'
+  },
+  centerContainer: {
+    flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
-    padding: 20,
+    padding: 20
   },
   title: {
     fontSize: 22,
     fontWeight: 'bold',
-    marginBottom: 10,
+    marginBottom: 6,
+    textAlign: 'center'
   },
   subtitle: {
     fontSize: 18,
     color: '#666',
-    marginBottom: 30,
+    marginBottom: 20,
+    textAlign: 'center'
   },
   workoutCard: {
     backgroundColor: '#fff',
     padding: 20,
     borderRadius: 12,
-    width: '90%',
+    width: '100%',
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.1,
     shadowRadius: 4,
     elevation: 3,
+    marginBottom: 20
   },
   exercise: {
     paddingVertical: 12,
     borderBottomWidth: 1,
-    borderBottomColor: '#eee',
+    borderBottomColor: '#eee'
   },
   exerciseName: {
     fontSize: 16,
-    fontWeight: '500',
+    fontWeight: '500'
   },
   exerciseDetails: {
     fontSize: 14,
-    color: '#666',
+    color: '#666'
+  },
+  buttonWrapper: {
+    width: '100%'
   },
   margin: {
-    marginTop: 12,
+    marginTop: 12
   },
   error: {
     color: 'red',
     textAlign: 'center',
-    marginBottom: 20,
+    marginBottom: 20
   }
 })
