@@ -1,0 +1,27 @@
+# Dependencies
+node_modules/
+/back/__pycache__/
+/back/*.pyc
+/back/*__pycache__/
+
+# Environment variables
+.env
+.front/.env
+/back/.env
+
+# Build outputs
+front/dist/
+front/build/
+
+# Logs
+*.log
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
