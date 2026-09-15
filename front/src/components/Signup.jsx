@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { createClient } from '@supabase/supabase-js';
 
-const Login = () => {
+const Signup = () => {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
@@ -27,7 +27,7 @@ const Login = () => {
 
       const supabase = createClient(supabaseUrl, supabaseAnonKey);
 
-      const { data: sessionData, error: supabaseError } = await supabase.auth.signInWithPassword({
+      const { data: sessionData, error: supabaseError } = await supabase.auth.signUp({
         email,
         password,
       });
@@ -36,14 +36,19 @@ const Login = () => {
 
       const { session, user } = sessionData;
       if (session && session.access_token) {
-        // Exchange Supabase token for our JWT
+        // Exchange Supabase token for our JWT and send questionnaire answers
         const API_BASE_URL = import.meta.env.VITE_API_URL || '/api';
-        const exchangeResponse = await fetch(`${API_BASE_URL}/auth/login`, {
+        const exchangeResponse = await fetch(`${API_BASE_URL}/auth/register`, {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
           },
-          body: JSON.stringify({ supabase_access_token: session.access_token }),
+          body: JSON.stringify({
+            supabase_access_token: session.access_token,
+            questionnaire: answers,
+            consent_privacy: consent.privacy,
+            consent_terms: consent.terms,
+          }),
         });
 
         if (!exchangeResponse.ok) {
@@ -56,6 +61,10 @@ const Login = () => {
         localStorage.setItem('user', JSON.stringify(user));
         // Navigate to workout dashboard
         navigate('/workout');
+      } else {
+        // Email verification required
+        setError('Please check your email to verify your account before logging in.');
+        setLoading(false);
       }
     } catch (err) {
       setError(err.message || 'An error occurred');
@@ -66,7 +75,7 @@ const Login = () => {
 
   return (
     <div className="card" style={{ maxWidth: '400px', margin: '40px auto' }}>
-      <h2>Login to Save Your Plan</h2>
+      <h2>Sign Up to Save Your Plan</h2>
       {answers && (
         <>
           <p><strong>Goal:</strong> {answers.goal}</p>
@@ -97,14 +106,14 @@ const Login = () => {
           />
         </div>
         <button type="submit" className="button" disabled={loading}>
-          {loading ? 'Logging in...' : 'Login'}
+          {loading ? 'Signing up...' : 'Sign Up'}
         </button>
       </form>
       <p>
-        Don't have an account? <a href="/signup">Sign up</a>
+        Already have an account? <a href="/login">Log in</a>
       </p>
     </div>
   );
 };
 
-export default Login;
+export default Signup;

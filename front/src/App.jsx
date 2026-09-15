@@ -1,31 +1,22 @@
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
+import Questionnaire from './components/questionnaire/Questionnaire';
+import Preview from './components/questionnaire/Preview';
 import Login from './components/Login';
-import WorkoutGenerator from './components/WorkoutGenerator';
+import Signup from './components/Signup';
+import WorkoutDashboard from './components/workout-plan/WorkoutDashboard';
 import { useState, useEffect } from 'react';
 
 function App() {
-  const [user, setUser] = useState(() => {
-    const userJson = localStorage.getItem('user');
-    return userJson ? JSON.parse(userJson) : null;
-  });
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     // Check if there's a user in localStorage on app start
     const userJson = localStorage.getItem('user');
     if (userJson) {
-      setUser(JSON.parse(userJson));
+      // User is logged in
     }
     setLoading(false);
   }, []);
-
-  const handleLogout = () => {
-    localStorage.removeItem('user');
-    localStorage.removeItem('supabaseAccessToken');
-    setUser(null);
-    // Redirect to login
-    window.location.href = '/login';
-  };
 
   if (loading) {
     return <div>Loading...</div>;
@@ -34,23 +25,30 @@ function App() {
   return (
     <BrowserRouter>
       <div className="App">
-        {!user && (
-          <Navigate replace to="/login" />
+        {!localStorage.getItem('accessToken') && (
+          <Navigate replace to="/questionnaire" />
         )}
-        {user && (
+        {localStorage.getItem('accessToken') && (
           <>
             <header className="App-header">
               <h1>Workout Generator</h1>
-              <p>Welcome, {user.email || ''}!</p>
-              <button onClick={handleLogout} className="button">
+              <p>Welcome, {JSON.parse(localStorage.getItem('user') || '{}').email || ''}!</p>
+              <button onClick={() => {
+                localStorage.removeItem('accessToken');
+                localStorage.removeItem('user');
+                window.location.href = '/login';
+              }} className="button">
                 Logout
               </button>
             </header>
             <main className="main-container">
               <Routes>
+                <Route path="/questionnaire" element={<Questionnaire />} />
+                <Route path="/preview" element={<Preview />} />
                 <Route path="/login" element={<Login />} />
-                <Route path="/workout" element={<WorkoutGenerator />} />
-                <Route path="/" element={<Navigate replace to="/workout" />} />
+                <Route path="/signup" element={<Signup />} />
+                <Route path="/workout" element={<WorkoutDashboard />} />
+                <Route path="/" element={<Navigate replace to="/questionnaire" />} />
               </Routes>
             </main>
           </>

@@ -1,0 +1,11 @@
+{
+  "compilerOptions": {
+    "allowJs": true,
+    "checkJs": false,
+    "noEmit": true,
+    "isolatedModules": true,
+    "strict": false
+  },
+  "include": [],
+  "exclude": ["vite.config.*", "node_modules"]
+}
