@@ -40,8 +40,8 @@ interface CustomSelectProps {
 }
 
 const CustomSelect: React.FC<CustomSelectProps> = ({ label, options, selectedValue, onValueChange }) => {
-  const [modalVisible, setModalVisible] = useState(false)
-  const selectedOption = options.find((opt) => opt.value === selectedValue)
+  const [modalVisible, setModalVisible] = useState<boolean>(false)
+  const selectedOption = options.find((opt: DropdownOption) => opt.value === selectedValue)
 
   return (
     <View style={styles.selectWrapper}>
@@ -64,8 +64,8 @@ const CustomSelect: React.FC<CustomSelectProps> = ({ label, options, selectedVal
             <Text style={styles.modalTitle}>{label}</Text>
             <FlatList
               data={options}
-              keyExtractor={(item) => item.value}
-              renderItem={({ item }) => (
+              keyExtractor={(item: DropdownOption) => item.value}
+              renderItem={({ item }: { item: DropdownOption }) => (
                 <TouchableOpacity
                   style={[
                     styles.optionItem,
@@ -140,14 +140,14 @@ export const QuestionnaireScreen = () => {
         label="Goal"
         options={goalOptions}
         selectedValue={formData.goal}
-        onValueChange={(val) => setFormData({ ...formData, goal: val })}
+        onValueChange={(val: string) => setFormData({ ...formData, goal: val })}
       />
 
       <Text style={styles.label}>Age</Text>
       <TextInput
         placeholder="Enter your age"
         value={formData.age}
-        onChangeText={(text) => setFormData({ ...formData, age: text })}
+        onChangeText={(text: string) => setFormData({ ...formData, age: text })}
         keyboardType="numeric"
         style={styles.input}
       />
@@ -156,7 +156,7 @@ export const QuestionnaireScreen = () => {
       <TextInput
         placeholder="Enter your weight"
         value={formData.weight}
-        onChangeText={(text) => setFormData({ ...formData, weight: text })}
+        onChangeText={(text: string) => setFormData({ ...formData, weight: text })}
         keyboardType="numeric"
         style={styles.input}
       />
@@ -165,14 +165,14 @@ export const QuestionnaireScreen = () => {
         label="Gender"
         options={genderOptions}
         selectedValue={formData.gender}
-        onValueChange={(val) => setFormData({ ...formData, gender: val })}
+        onValueChange={(val: string) => setFormData({ ...formData, gender: val })}
       />
 
       <Text style={styles.label}>Days per week you want to train</Text>
       <TextInput
         placeholder="Enter number of days (1-7)"
         value={formData.days_per_week}
-        onChangeText={(text) => setFormData({ ...formData, days_per_week: text })}
+        onChangeText={(text: string) => setFormData({ ...formData, days_per_week: text })}
         keyboardType="numeric"
         style={styles.input}
       />
@@ -181,7 +181,7 @@ export const QuestionnaireScreen = () => {
         label="Where will you be training?"
         options={locationOptions}
         selectedValue={formData.location}
-        onValueChange={(val) => setFormData({ ...formData, location: val })}
+        onValueChange={(val: string) => setFormData({ ...formData, location: val })}
       />
 
       {formData.location === 'home_equipment' && (
@@ -190,7 +190,7 @@ export const QuestionnaireScreen = () => {
           <TextInput
             placeholder="List your equipment (e.g. dumbbells, barbell)"
             value={formData.equipment}
-            onChangeText={(text) => setFormData({ ...formData, equipment: text })}
+            onChangeText={(text: string) => setFormData({ ...formData, equipment: text })}
             style={styles.input}
           />
         </>
