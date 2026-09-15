@@ -70,7 +70,7 @@ export const WorkoutWeekScreen = () => {
 
   return (
     <View style={styles.container}>
-      <Text style={styles.title}>This Week's Workouts</Text>
+      <Text style={styles.title}>This Week's Workouts:</Text>
       <FlatList
         data={weekWorkouts}
         keyExtractor={(item) => item.date.toString()}
