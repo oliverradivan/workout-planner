@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { createClient } from '@supabase/supabase-js';
 
@@ -12,6 +12,18 @@ const Signup = () => {
 
   // Get questionnaire answers and consent from location state (if coming from preview)
   const { answers, consent } = location.state || {};
+
+  useEffect(() => {
+    // If someone lands here directly (e.g. typed the URL, refreshed the page),
+    // there's no questionnaire data to register with — send them back to start.
+    if (!answers || !consent) {
+      navigate('/questionnaire');
+    }
+  }, [answers, consent, navigate]);
+
+  if (!answers || !consent) {
+    return <div>Redirecting...</div>;
+  }
 
   const handleSubmit = async (e) => {
     e.preventDefault();

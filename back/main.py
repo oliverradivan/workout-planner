@@ -23,9 +23,15 @@ supabase: Client = create_client(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY)
 app = FastAPI(title="Workout Generator API")
 
 # CORS Middleware
+# NOTE: allow_origins=["*"] is INVALID together with allow_credentials=True —
+# browsers reject wildcard origins when credentials are allowed. Replace the
+# list below with your actual frontend origin(s).
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],  # Replace with ["https://your-app.vercel.app"] in production
+    allow_origins=[
+        "http://localhost:5173",
+        "https://your-app.vercel.app",  # TODO: replace with your real Vercel domain
+    ],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -75,10 +81,18 @@ class WorkoutLogResponse(BaseModel):
     completed_at: str
     notes: Optional[str] = None
 
+class TokenExchangeRequest(BaseModel):
+    supabase_access_token: str
+
 class RegisterRequest(BaseModel):
+    supabase_access_token: str
     questionnaire: QuestionnaireAnswers
     consent_privacy: bool
     consent_terms: bool
+
+class WorkoutLogRequest(BaseModel):
+    day_id: str
+    notes: Optional[str] = None
 
 # --- Authentication Dependency ---
 
@@ -108,6 +122,37 @@ def get_current_user(credentials: HTTPAuthorizationCredentials = Depends(bearer_
             detail=f"Authentication failed: {str(e)}",
         )
 
+def _create_initial_workout_plan(user_profile: dict) -> str:
+    """Creates a 7-day workout plan for a freshly registered user."""
+    plan_data = {
+        "user_profile_id": user_profile["id"],
+        "plan_name": f"Plan for {user_profile['goal']}",
+        "start_date": datetime.date.today().isoformat(),
+        "end_date": (datetime.date.today() + datetime.timedelta(days=6)).isoformat(),
+        "is_active": True,
+    }
+    plan_response = supabase.table("workout_plans").insert(plan_data).execute()
+    if not plan_response.data:
+        raise HTTPException(status_code=500, detail="Failed to create workout plan")
+
+    plan_id = plan_response.data[0]["id"]
+
+    for day in range(1, 8):
+        day_data = {
+            "workout_plan_id": plan_id,
+            "day_number": day,
+            "workout_date": (datetime.date.today() + datetime.timedelta(days=day - 1)).isoformat(),
+            "exercises": [
+                {"name": "Push-ups", "sets": 3, "reps": 10},
+                {"name": "Squats", "sets": 3, "reps": 15},
+                {"name": "Plank", "sets": 3, "duration": "30s"},
+            ],
+            "is_completed": False,
+        }
+        supabase.table("workout_plan_days").insert(day_data).execute()
+
+    return str(plan_id)
+
 # --- Routes ---
 
 @app.get("/api/health")
@@ -125,13 +170,32 @@ def generate_workout_preview(answers: QuestionnaireAnswers):
         ]
     }
 
-@app.post("/api/auth/register")
-def register(request: RegisterRequest, credentials: HTTPAuthorizationCredentials = Depends(bearer_scheme)):
-    # Validate token from Auth header
-    user_response = supabase.auth.get_user(credentials.credentials)
+@app.post("/api/auth/login")
+def login(request: TokenExchangeRequest):
+    """
+    Validates a Supabase session token and confirms the user has a profile.
+    We don't mint a separate JWT — the validated Supabase access token IS
+    the access token the frontend should keep using for subsequent calls.
+    """
+    user_response = supabase.auth.get_user(request.supabase_access_token)
     if not user_response.user:
         raise HTTPException(status_code=401, detail="Invalid token")
-    
+
+    supabase_user_id = user_response.user.id
+    profile = supabase.table("user_profiles").select("id").eq("supabase_user_id", supabase_user_id).execute()
+    if not profile.data:
+        raise HTTPException(status_code=404, detail="User profile not found. Please register.")
+
+    return {"access_token": request.supabase_access_token}
+
+@app.post("/api/auth/register")
+def register(request: RegisterRequest):
+    # Validate the Supabase token passed in the body (not an Authorization header —
+    # the frontend doesn't have a backend-issued token yet at this point)
+    user_response = supabase.auth.get_user(request.supabase_access_token)
+    if not user_response.user:
+        raise HTTPException(status_code=401, detail="Invalid token")
+
     supabase_user_id = user_response.user.id
 
     existing = supabase.table("user_profiles").select("id").eq("supabase_user_id", supabase_user_id).execute()
@@ -150,45 +214,23 @@ def register(request: RegisterRequest, credentials: HTTPAuthorizationCredentials
         "consent_privacy": request.consent_privacy,
         "consent_terms": request.consent_terms,
     }
-    
+
     profile_response = supabase.table("user_profiles").insert(profile_data).execute()
     if not profile_response.data:
         raise HTTPException(status_code=500, detail="Failed to create user profile")
-        
-    return {"message": "Profile created successfully"}
+
+    new_profile = profile_response.data[0]
+
+    # Generate the user's first workout plan right away, so the dashboard
+    # has something to show immediately after registration.
+    _create_initial_workout_plan(new_profile)
+
+    return {"access_token": request.supabase_access_token, "message": "Profile created successfully"}
 
 @app.post("/api/generate-workout-plan")
 def generate_workout_plan(answers: QuestionnaireAnswers, current_user: dict = Depends(get_current_user)):
-    user_id = current_user["id"]
-    
-    plan_data = {
-        "user_profile_id": user_id,
-        "plan_name": f"Plan for {current_user['goal']}",
-        "start_date": datetime.date.today().isoformat(),
-        "end_date": (datetime.date.today() + datetime.timedelta(days=6)).isoformat(),
-        "is_active": True
-    }
-    plan_response = supabase.table("workout_plans").insert(plan_data).execute()
-    if not plan_response.data:
-        raise HTTPException(status_code=500, detail="Failed to create workout plan")
-        
-    plan_id = plan_response.data[0]["id"]
-
-    for day in range(1, 8):
-        day_data = {
-            "workout_plan_id": plan_id,
-            "day_number": day,
-            "workout_date": (datetime.date.today() + datetime.timedelta(days=day-1)).isoformat(),
-            "exercises": [
-                {"name": "Push-ups", "sets": 3, "reps": 10},
-                {"name": "Squats", "sets": 3, "reps": 15},
-                {"name": "Plank", "sets": 3, "duration": "30s"}
-            ],
-            "is_completed": False
-        }
-        supabase.table("workout_plan_days").insert(day_data).execute()
-
-    return {"plan_id": str(plan_id), "message": "Workout plan created"}
+    plan_id = _create_initial_workout_plan(current_user)
+    return {"plan_id": plan_id, "message": "Workout plan created"}
 
 @app.get("/api/workout-plans", response_model=List[WorkoutPlanResponse])
 def get_workout_plans(current_user: dict = Depends(get_current_user)):
@@ -209,28 +251,28 @@ def get_workout_plan(plan_id: str, current_user: dict = Depends(get_current_user
     }
 
 @app.post("/api/workout-logs")
-def log_workout(day_id: str, notes: Optional[str] = None, current_user: dict = Depends(get_current_user)):
-    day_response = supabase.table("workout_plan_days").select("id, workout_plan_id").eq("id", day_id).execute()
+def log_workout(request: WorkoutLogRequest, current_user: dict = Depends(get_current_user)):
+    day_response = supabase.table("workout_plan_days").select("id, workout_plan_id").eq("id", request.day_id).execute()
     if not day_response.data:
         raise HTTPException(status_code=404, detail="Workout day not found")
-        
+
     day = day_response.data[0]
     plan_response = supabase.table("workout_plans").select("id, user_profile_id").eq("id", day["workout_plan_id"]).execute()
-    
+
     if not plan_response.data or plan_response.data[0]["user_profile_id"] != current_user["id"]:
         raise HTTPException(status_code=403, detail="Not authorized to log this workout")
 
     log_data = {
         "user_profile_id": current_user["id"],
-        "workout_plan_day_id": day_id,
-        "notes": notes
+        "workout_plan_day_id": request.day_id,
+        "notes": request.notes,
     }
     log_response = supabase.table("workout_logs").insert(log_data).execute()
-    
+
     supabase.table("workout_plan_days").update({
-        "is_completed": True, 
+        "is_completed": True,
         "completed_at": datetime.datetime.utcnow().isoformat()
-    }).eq("id", day_id).execute()
+    }).eq("id", request.day_id).execute()
 
     return {"log_id": log_response.data[0]["id"], "message": "Workout logged"}
 
