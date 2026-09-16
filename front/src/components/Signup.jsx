@@ -22,7 +22,7 @@ const Signup = () => {
   }, [answers, consent, navigate]);
 
   if (!answers || !consent) {
-    return <div>Redirecting...</div>;
+    return null;
   }
 
   const handleSubmit = async (e) => {

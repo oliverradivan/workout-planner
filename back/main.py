@@ -1,7 +1,7 @@
 import os
 import datetime
 from typing import Any, List, Optional
-from pydantic import BaseModel
+from pydantic import BaseModel, validator
 from fastapi import FastAPI, Depends, HTTPException, status
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
@@ -13,6 +13,7 @@ load_dotenv()
 
 SUPABASE_URL = os.getenv("SUPABASE_URL")
 SUPABASE_SERVICE_ROLE_KEY = os.getenv("SUPABASE_SERVICE_ROLE_KEY")
+JWT_SECRET = os.getenv("JWT_SECRET")
 
 if not SUPABASE_URL or not SUPABASE_SERVICE_ROLE_KEY:
     raise ValueError("Supabase URL and Service Role Key must be set in environment variables")
@@ -49,6 +50,22 @@ class QuestionnaireAnswers(BaseModel):
     training_days_per_week: int
     training_location: str
     equipment_details: Optional[str] = None
+
+    @validator('age')
+    def age_must_be_teen_or_adult(cls, v):
+        if v < 13:
+            raise ValueError('Age must be at least 13')
+        if v > 120:
+            raise ValueError('Age must not exceed 120')
+        return v
+
+    @validator('weight')
+    def weight_must_be_positive(cls, v):
+        if v <= 0:
+            raise ValueError('Weight must be positive')
+        if v > 500:
+            raise ValueError('Weight must not exceed 500 kg')
+        return v
 
 class UserProfileResponse(BaseModel):
     id: str
@@ -94,6 +111,57 @@ class WorkoutLogRequest(BaseModel):
     day_id: str
     notes: Optional[str] = None
 
+def get_exercises_for_user(answers: QuestionnaireAnswers, limit: int = 3) -> List[dict]:
+    """Fetch exercises suitable for the user's equipment and location."""
+    try:
+        # Fetch all exercises (in a real app, we'd filter in the DB)
+        response = supabase.table("exercises").select("*").execute()
+        if not response.data:
+            return []
+        
+        exercises = response.data
+        filtered = []
+        for ex in exercises:
+            # Check location: training_location should be in location_tags array
+            loc_tags = ex.get("location_tags", [])
+            if isinstance(loc_tags, str):
+                # In case it's a string, convert to list? But it's stored as array.
+                # We'll assume it's a list.
+                loc_tags = [loc_tags]
+            if answers.training_location not in loc_tags:
+                continue
+            
+            # Check equipment: if equipment_details provided, see if equipment_required matches
+            eq_required = ex.get("equipment_required", "").lower()
+            if answers.equipment_details:
+                # Split by commas and/or spaces, remove empty
+                eq_keywords = [e.strip().lower() for e in answers.equipment_details.replace(',', ' ').split() if e.strip()]
+                if not any(keyword in eq_required for keyword in eq_keywords):
+                    continue
+            # If no equipment_details, we accept any equipment
+            
+            filtered.append(ex)
+        
+        # Limit to the requested number
+        limited = filtered[:limit]
+        
+        # Convert to the expected format
+        result = []
+        for ex in limited:
+            exercise_obj = {"name": ex["name"]}
+            if ex.get("default_sets") is not None:
+                exercise_obj["sets"] = ex["default_sets"]
+            if ex.get("default_reps") is not None:
+                exercise_obj["reps"] = ex["default_reps"]
+            if ex.get("default_duration") is not None:
+                exercise_obj["duration"] = ex["default_duration"]
+            result.append(exercise_obj)
+        
+        return result
+    except Exception as e:
+        print(f"Error fetching exercises: {e}")
+        return []
+
 # --- Authentication Dependency ---
 
 def get_current_user(credentials: HTTPAuthorizationCredentials = Depends(bearer_scheme)) -> dict:
@@ -117,9 +185,11 @@ def get_current_user(credentials: HTTPAuthorizationCredentials = Depends(bearer_
             )
         return profile.data[0]
     except Exception as e:
+        # Log the error for debugging (in production, use proper logging)
+        print(f"Authentication error: {e}")
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
-            detail=f"Authentication failed: {str(e)}",
+            detail="Authentication failed. Please check your credentials.",
         )
 
 def _create_initial_workout_plan(user_profile: dict) -> str:
@@ -138,15 +208,29 @@ def _create_initial_workout_plan(user_profile: dict) -> str:
     plan_id = plan_response.data[0]["id"]
 
     for day in range(1, 8):
+        # Get exercises for user
+        answers_dict = {
+            "goal": user_profile["goal"],
+            "age": user_profile["age"],
+            "weight": user_profile["weight"],
+            "gender": user_profile["gender"],
+            "training_days_per_week": user_profile["training_days_per_week"],
+            "training_location": user_profile["training_location"],
+            "equipment_details": user_profile.get("equipment_details")
+        }
+        answers_obj = QuestionnaireAnswers(**answers_dict)
+        exercises = get_exercises_for_user(answers_obj, limit=3)
+        if not exercises:
+            exercises = [
+                {"name": "Push-ups", "sets": 3, "reps": 10},
+                {"name": "Squats", "sets": 3, "reps": 15},
+                {"name": "Plank", "sets": 3, "duration": "30s"},
+            ]
         day_data = {
             "workout_plan_id": plan_id,
             "day_number": day,
             "workout_date": (datetime.date.today() + datetime.timedelta(days=day - 1)).isoformat(),
-            "exercises": [
-                {"name": "Push-ups", "sets": 3, "reps": 10},
-                {"name": "Squats", "sets": 3, "reps": 15},
-                {"name": "Plank", "sets": 3, "duration": "30s"},
-            ],
+            "exercises": exercises,
             "is_completed": False,
         }
         supabase.table("workout_plan_days").insert(day_data).execute()
@@ -161,13 +245,17 @@ def health_check():
 
 @app.post("/api/generate-workout-preview")
 def generate_workout_preview(answers: QuestionnaireAnswers):
-    return {
-        "day": 1,
-        "exercises": [
+    exercises = get_exercises_for_user(answers, limit=3)
+    if not exercises:
+        # Fallback to hardcoded exercises
+        exercises = [
             {"name": "Push-ups", "sets": 3, "reps": 10},
             {"name": "Squats", "sets": 3, "reps": 15},
             {"name": "Plank", "sets": 3, "duration": "30s"}
         ]
+    return {
+        "day": 1,
+        "exercises": exercises
     }
 
 @app.post("/api/auth/login")

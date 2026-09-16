@@ -74,13 +74,8 @@ const WorkoutDashboard = () => {
       setDays(daysData.days || []);
 
       // Find today's workout (assuming day number corresponds to day of week or we can use date)
-      const today = new Date();
-      today.setHours(0,0,0,0);
-      const todayWorkoutDay = daysData.days.find(day => {
-        const workoutDate = new Date(day.workout_date);
-        workoutDate.setHours(0,0,0,0);
-        return workoutDate.getTime() === today.getTime();
-      });
+      const todayStr = new Date().toISOString().split('T')[0];
+      const todayWorkoutDay = daysData.days.find(day => day.workout_date === todayStr);
 
       if (todayWorkoutDay) {
         setTodayWorkout(todayWorkoutDay);
@@ -101,6 +96,10 @@ const WorkoutDashboard = () => {
     try {
       const accessToken = localStorage.getItem('accessToken');
       const API_BASE_URL = import.meta.env.VITE_API_URL || '/api';
+      
+      // Ask user for optional notes
+      const notes = prompt('Add notes about your workout (optional):') || '';
+      
       const response = await fetch(`${API_BASE_URL}/workout-logs`, {
         method: 'POST',
         headers: {
@@ -109,7 +108,7 @@ const WorkoutDashboard = () => {
         },
         body: JSON.stringify({
           day_id: todayWorkout.id,
-          notes: `Completed on ${new Date().toLocaleDateString()}`
+          notes: notes.trim()
         }),
       });
 
@@ -165,7 +164,7 @@ const WorkoutDashboard = () => {
             {plan && (
               <div>
                 <h3>{plan.plan_name}</h3>
-                <p>From: {plan.start_date} {plan.end_date ? `to: {plan.end_date}` : ''}</p>
+                <p>From: {plan.start_date} {plan.end_date ? `to: ${plan.end_date}` : ''}</p>
               </div>
             )}
             <div>
